@@ -1,0 +1,1 @@
+export default function SportsPage(){return(<div style={{padding:'2rem',fontFamily:'system-ui',background:'#060d1f',minHeight:'100vh'}}><h1 style={{color:'#fb923c'}}>Sports</h1><p style={{color:'rgba(255,255,255,0.5)'}}>Loading...</p></div>)}
