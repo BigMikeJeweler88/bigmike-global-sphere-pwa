@@ -30,16 +30,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* iOS PWA — must be installed via Safari "Add to Home Screen" to hide URL bar */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="BigMike CRM" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
       </head>
-      <body className="bg-[#060d1f] text-white antialiased">
+      <body className="bg-[#060d1f] text-white antialiased overflow-x-hidden">
         <Providers>
-          <div className="flex flex-col min-h-screen">
+          <div className="flex flex-col min-h-[100dvh]">
             <MobileHeader />
             <TopModeBar />
-            <main className="flex-1 pb-20 pt-[104px]">
+            <main className="flex-1 pb-[env(safe-area-inset-bottom,80px)] pt-[104px] pb-20">
               {children}
             </main>
             <BottomNav />

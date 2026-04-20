@@ -1,1 +1,19 @@
-{"name":"BigMike Global Sports CRM","short_name":"BigMike CRM","description":"Global Sports Client Intelligence Platform","start_url":"/","display":"standalone","background_color":"#060d1f","theme_color":"#060d1f","orientation":"portrait-primary","icons":[{"src":"/icons/icon-192x192.png","sizes":"192x192","type":"image/png","purpose":"maskable any"},{"src":"/icons/icon-512x512.png","sizes":"512x512","type":"image/png","purpose":"maskable any"}]}
+{
+  "name": "BigMike Global Sports CRM",
+  "short_name": "BigMike CRM",
+  "description": "Global Sports Client Intelligence Platform — 4,200+ clients",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen"],
+  "background_color": "#060d1f",
+  "theme_color": "#060d1f",
+  "orientation": "portrait-primary",
+  "categories": ["sports", "business", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable any" }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
