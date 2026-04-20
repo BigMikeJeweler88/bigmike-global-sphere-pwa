@@ -1,0 +1,5 @@
+export const REPLIT_BASE_URL=process.env.NEXT_PUBLIC_REPLIT_URL||'https://global-sphere--BigMike88.replit.app';
+export const BASE_URL=REPLIT_BASE_URL;
+export async function fetcher<T>(path:string):Promise<T>{const r=await fetch(`${BASE_URL}${path}`,{headers:{'Content-Type':'application/json'},next:{revalidate:30}});if(!r.ok)throw new Error(`API error ${r.status}: ${path}`);return r.json();}
+export async function poster<T>(path:string,body?:unknown):Promise<T>{const r=await fetch(`${BASE_URL}${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});if(!r.ok)throw new Error(`API error ${r.status}: ${path}`);return r.json();}
+export async function putter<T>(path:string,body?:unknown):Promise<T>{const r=await fetch(`${BASE_URL}${path}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});if(!r.ok)throw new Error(`API error ${r.status}: ${path}`);return r.json();}
