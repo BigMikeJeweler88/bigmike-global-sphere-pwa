@@ -1,0 +1,10 @@
+@import "tailwindcss";
+:root{--color-background:hsl(222 47% 4%);--color-foreground:hsl(210 40% 96%);--color-card:hsl(222 47% 6%);--color-card-foreground:hsl(210 40% 96%);--color-primary:hsl(217 91% 60%);--color-primary-foreground:hsl(222 47% 11%);--color-secondary:hsl(217 33% 14%);--color-secondary-foreground:hsl(210 40% 96%);--color-muted:hsl(217 33% 14%);--color-muted-foreground:hsl(215 20% 55%);--color-border:hsl(217 33% 12%);--color-input:hsl(217 33% 12%);--color-ring:hsl(217 91% 60%);--radius:0.75rem;}
+html{color-scheme:dark;}
+body{background-color:hsl(222 47% 4%);color:hsl(210 40% 96%);}
+.scrollbar-none::-webkit-scrollbar{display:none;}
+.scrollbar-none{-ms-overflow-style:none;scrollbar-width:none;}
+.safe-area-bottom{padding-bottom:env(safe-area-inset-bottom,0px);}
+*{-webkit-tap-highlight-color:transparent;}
+.line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.line-clamp-3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
