@@ -1,1 +1,15 @@
-export default function AlertsPage(){return(<div style={{padding:'2rem',fontFamily:'system-ui',background:'#060d1f',minHeight:'100vh'}}><h1 style={{color:'#f87171'}}>Alerts</h1><p style={{color:'rgba(255,255,255,0.5)'}}>Loading...</p></div>)}
+'use client'
+import{useAlerts}from'@/lib/api/hooks'
+import{AlertTriangle,Bell,CheckCircle,Clock}from'lucide-react'
+import{formatDistanceToNow}from'date-fns'
+const sev={critical:{color:'text-red-400',bg:'bg-red-500/10',border:'border-red-500/20'},high:{color:'text-orange-400',bg:'bg-orange-500/10',border:'border-orange-500/20'},medium:{color:'text-yellow-400',bg:'bg-yellow-500/10',border:'border-yellow-500/20'},low:{color:'text-blue-400',bg:'bg-blue-500/10',border:'border-blue-500/20'}}
+export default function AlertsPage(){
+  const{data:alerts,isLoading}=useAlerts()
+  const all=alerts||[]
+  const grouped={critical:all.filter(a=>a.severity==='critical'||a.priority==='critical'),high:all.filter(a=>(a.severity==='high'||a.priority==='high')&&a.severity!=='critical'),other:all.filter(a=>!['critical','high'].includes(a.severity)&&!['critical','high'].includes(a.priority))}
+  return(<div className="px-4 py-4 space-y-4 max-w-2xl mx-auto">
+    <div><p className="text-[11px] text-red-400 uppercase tracking-widest font-medium">JARVIS Intelligence</p><h1 className="text-2xl font-bold text-white">Alerts</h1><p className="text-white/40 text-sm">{all.length} active · {grouped.critical.length} critical</p></div>
+    {isLoading?<div className="space-y-2">{[...Array(5)].map((_,i)=><div key={i} className="h-20 bg-white/5 rounded-xl animate-pulse"/>)}</div>:all.length===0?<div className="text-center py-16 text-white/30"><Bell className="h-10 w-10 mx-auto mb-3 opacity-30"/><p className="text-sm">No active alerts</p><p className="text-xs mt-1">All clear — JARVIS monitoring</p></div>:
+    <>{(['critical','high','other']).map(s=>{const items=grouped[s];if(!items.length)return null;const c=sev[s]||sev.low;return(<div key={s}><div className="flex items-center gap-2 mb-2"><span className={'text-xs font-semibold uppercase tracking-wider '+c.color}>{s==='other'?'Other':s}</span><span className={'text-[10px] px-1.5 py-0.5 rounded-full border '+c.bg+' '+c.color+' '+c.border}>{items.length}</span></div><div className="space-y-2">{items.map(alert=>{const cfg=sev[alert.severity||alert.priority||'low']||sev.low;return(<div key={alert.id} className={'rounded-xl p-3.5 border '+cfg.bg+' '+cfg.border}><div className="flex items-start justify-between gap-2 mb-1"><div className="text-sm font-semibold text-white leading-snug flex-1">{alert.title||alert.alert_type}</div>{alert.is_read?<CheckCircle className="h-4 w-4 text-white/20 flex-shrink-0"/>:<div className={'h-2 w-2 rounded-full mt-1 flex-shrink-0 '+cfg.color.replace('text-','bg-')}/>}</div><p className="text-xs text-white/60 leading-relaxed line-clamp-3">{alert.message||alert.description}</p><div className="flex items-center justify-between mt-2">{alert.client_name&&<span className="text-[10px] text-white/40">{alert.client_name}</span>}{alert.created_at&&<span className="text-[10px] text-white/30 flex items-center gap-1"><Clock className="h-2.5 w-2.5"/>{formatDistanceToNow(new Date(alert.created_at),{addSuffix:true})}</span>}</div></div>)})}</div></div>)})}</>}
+  </div>)
+}
