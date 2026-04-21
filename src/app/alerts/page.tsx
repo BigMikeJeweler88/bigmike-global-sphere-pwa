@@ -1,87 +1,74 @@
 'use client'
-import { useAlerts, useProactiveAlerts } from '@/lib/api/hooks'
-import { Bell, AlertTriangle, Clock } from 'lucide-react'
+import { useAlerts } from '@/lib/api/hooks'
+import { Bell, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
 
 export default function AlertsPage() {
-  const { data: alertData, isLoading: a1Loading } = useAlerts()
-  const { data: proactiveData, isLoading: a2Loading } = useProactiveAlerts()
-  const isLoading = a1Loading && a2Loading
+  const { data, isLoading } = useAlerts()
+  const all: any[] = Array.isArray(data) ? data : []
 
-  const raw1 = alertData as any
-  const raw2 = proactiveData as any
-  const alerts1: any[] = Array.isArray(raw1) ? raw1 : (raw1?.data || raw1?.alerts || [])
-  const alerts2: any[] = Array.isArray(raw2) ? raw2 : (raw2?.data || raw2?.alerts || [])
-  const all = [...alerts1, ...alerts2]
+  const critical = all.filter(a => a.alert_priority === 'critical')
+  const high     = all.filter(a => a.alert_priority === 'high')
+  const other    = all.filter(a => !['critical','high'].includes(a.alert_priority || ''))
 
-  const bySeverity = {
-    critical: all.filter(a => a.severity === 'critical' || a.priority === 'critical' || a.type === 'critical'),
-    high: all.filter(a => (a.severity === 'high' || a.priority === 'high') && a.severity !== 'critical'),
-    other: all.filter(a => !['critical', 'high'].includes(a.severity || '') && !['critical', 'high'].includes(a.priority || '')),
+  const cfg: Record<string, any> = {
+    critical: { label: 'Critical', color: 'text-red-400',    bg: 'bg-red-500/10',    border: 'border-red-500/20' },
+    high:     { label: 'High',     color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+    other:    { label: 'Other',    color: 'text-blue-400',   bg: 'bg-blue-500/10',   border: 'border-blue-500/20' },
   }
 
-  const sevConfig: any = {
-    critical: { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' },
-    high:     { color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
-    other:    { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' },
-  }
+  const Card = ({ a, sev }: any) => (
+    <div className={`rounded-xl p-3.5 border ${cfg[sev].bg} ${cfg[sev].border}`}>
+      <div className="flex items-start gap-2 mb-1">
+        <AlertTriangle className={`h-4 w-4 ${cfg[sev].color} mt-0.5 flex-shrink-0`} />
+        <div className="text-sm font-semibold text-white leading-snug flex-1">
+          {a.alert_title || a.alert_type}
+        </div>
+      </div>
+      {a.alert_message && (
+        <p className="text-xs text-white/60 leading-relaxed line-clamp-3 pl-6">{a.alert_message}</p>
+      )}
+      {a.action_recommended && (
+        <p className="text-[10px] text-cyan-400/80 mt-1.5 pl-6 line-clamp-1">→ {a.action_recommended}</p>
+      )}
+      <div className="flex items-center justify-between mt-2 pl-6">
+        {a.client_name && <span className="text-[10px] text-white/40">{a.client_name}{a.league ? ` · ${a.league}` : ''}</span>}
+        {a.created_at && (
+          <span className="text-[10px] text-white/30 flex items-center gap-1">
+            <Clock className="h-2.5 w-2.5" />
+            {new Date(a.created_at).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+    </div>
+  )
 
   return (
     <div className="px-4 py-4 space-y-4 max-w-2xl mx-auto pb-24">
       <div>
         <p className="text-[11px] text-red-400 uppercase tracking-widest font-medium">JARVIS Intelligence</p>
         <h1 className="text-2xl font-bold text-white">Alerts</h1>
-        <p className="text-white/40 text-sm">{all.length} active · {bySeverity.critical.length} critical</p>
+        <p className="text-white/40 text-sm">{all.length} active · {critical.length} critical</p>
       </div>
 
       {isLoading ? (
-        <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-20 bg-white/5 rounded-xl animate-pulse" />)}</div>
+        <div className="space-y-2">{[...Array(5)].map((_,i) => <div key={i} className="h-20 bg-white/5 rounded-xl animate-pulse"/>)}</div>
       ) : all.length === 0 ? (
         <div className="text-center py-16 text-white/30">
-          <Bell className="h-10 w-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No active alerts</p>
-          <p className="text-xs mt-1">All clear — JARVIS is monitoring</p>
+          <CheckCircle className="h-10 w-10 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">All clear</p>
+          <p className="text-xs mt-1">JARVIS is monitoring</p>
         </div>
       ) : (
         <>
-          {(['critical', 'high', 'other'] as const).map(sev => {
-            const items = bySeverity[sev]
-            if (!items.length) return null
-            const cfg = sevConfig[sev]
-            return (
-              <div key={sev}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${cfg.color}`}>{sev === 'other' ? 'Other' : sev}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${cfg.bg} ${cfg.color} ${cfg.border}`}>{items.length}</span>
-                </div>
-                <div className="space-y-2">
-                  {items.map((alert: any) => (
-                    <div key={alert.id} className={`rounded-xl p-3.5 border ${cfg.bg} ${cfg.border}`}>
-                      <div className="flex items-start gap-2 mb-1">
-                        <AlertTriangle className={`h-4 w-4 ${cfg.color} mt-0.5 flex-shrink-0`} />
-                        <div className="text-sm font-semibold text-white leading-snug flex-1">
-                          {alert.title || alert.alert_type || alert.type || alert.message}
-                        </div>
-                      </div>
-                      {(alert.message || alert.description || alert.content) && (
-                        <p className="text-xs text-white/60 leading-relaxed line-clamp-3 pl-6">
-                          {alert.message || alert.description || alert.content}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between mt-2 pl-6">
-                        {alert.client_name && <span className="text-[10px] text-white/40">{alert.client_name}</span>}
-                        {alert.created_at && (
-                          <span className="text-[10px] text-white/30 flex items-center gap-1">
-                            <Clock className="h-2.5 w-2.5" />
-                            {new Date(alert.created_at).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          {[['critical', critical], ['high', high], ['other', other]].map(([sev, items]: any) => items.length ? (
+            <div key={sev}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-xs font-semibold uppercase tracking-wider ${cfg[sev].color}`}>{cfg[sev].label}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${cfg[sev].bg} ${cfg[sev].color} ${cfg[sev].border}`}>{items.length}</span>
               </div>
-            )
-          })}
+              <div className="space-y-2">{items.map((a: any) => <Card key={a.id} a={a} sev={sev}/>)}</div>
+            </div>
+          ) : null)}
         </>
       )}
     </div>

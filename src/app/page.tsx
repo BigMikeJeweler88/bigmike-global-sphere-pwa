@@ -13,7 +13,7 @@ export default function Home() {
 
   const alerts = (alertData as any) || []
   const alertList = Array.isArray(alerts) ? alerts : (alerts?.alerts || alerts?.data || [])
-  const criticalAlerts = alertList.filter((a: any) => a.severity === 'critical' || a.priority === 'critical')
+  const criticalAlerts = alertList.filter((a: any) => a.alert_priority === 'critical')
 
   const counts = (summary as any) || {}
   const totalAthletes = counts.total_athletes ?? counts.athletes ?? '1,572'
