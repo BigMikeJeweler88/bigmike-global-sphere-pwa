@@ -1,207 +1,291 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetcher, poster } from './config'
+import { supabase, poster } from './config'
 
-// ── Dashboard / Situation Room ─────────────────────────────────────────────
-// Returns: { total_clients, total_contract_value, avg_salary, leagues_count, by_league, recent_exceptional_performances }
+// ── Dashboard Summary ──────────────────────────────────────────────────────
 export const useDashboardSummary = () => useQuery({
   queryKey: ['dashboard-summary'],
-  queryFn: () => fetcher<any>('/api/dashboard/summary'),
+  queryFn: async () => {
+    const { count: total } = await supabase.from('clients').select('*', { count: 'exact', head: true })
+    const { count: athletes } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('client_type', 'athlete')
+    const { count: music } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('client_type', 'music')
+    const { count: civilians } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('client_type', 'civilian')
+    const { count: influencers } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('client_type', 'influencer')
+    return { total_clients: total, athletes, music, civilians, influencers }
+  },
   staleTime: 60_000,
 })
 
-// Returns: { report_text, sent_at, subject } or similar
-export const useDailyReport = () => useQuery({
-  queryKey: ['daily-report'],
-  queryFn: () => fetcher<any>('/api/daily-reports/latest'),
-})
+export const useSituationRoom = useDashboardSummary
 
-// Returns: array of { id, client_name, league, stat_type, stat_value, game_date, opponent }
+// ── Live Stats / Daily Report ──────────────────────────────────────────────
 export const useLiveStats = () => useQuery({
   queryKey: ['live-stats'],
-  queryFn: () => fetcher<any>('/api/stats/live'),
+  queryFn: async () => {
+    const { data } = await supabase.from('exceptional_stats').select('*').order('created_at', { ascending: false }).limit(20)
+    return data || []
+  },
   refetchInterval: 30_000,
 })
 
-export const useRecentStats = () => useQuery({
-  queryKey: ['recent-stats'],
-  queryFn: () => fetcher<any>('/api/stats/recent'),
+export const useDailyReport = () => useQuery({
+  queryKey: ['daily-report'],
+  queryFn: async () => {
+    const { data } = await supabase.from('daily_reports').select('*').order('created_at', { ascending: false }).limit(1).single()
+    return data
+  },
 })
 
 export const useSendDailyReport = () => useMutation({
   mutationFn: () => poster('/api/reports/send-now'),
 })
 
-// ── Athletes / Clients ─────────────────────────────────────────────────────
-// /api/clients returns all clients; pass client_type=athlete to filter
-export const useAthletes = (p?: any) => useQuery({
-  queryKey: ['athletes', p],
-  queryFn: () => fetcher<any>('/api/clients?' + new URLSearchParams({ client_type: 'athlete', ...p }).toString()),
+// ── Athletes ───────────────────────────────────────────────────────────────
+export const useAthletes = (filters?: any) => useQuery({
+  queryKey: ['athletes', filters],
+  queryFn: async () => {
+    let q = supabase.from('clients').select('*').eq('client_type', 'athlete').order('name').limit(200)
+    if (filters?.search) q = q.ilike('name', `%${filters.search}%`)
+    if (filters?.league) q = q.eq('league', filters.league)
+    const { data, count } = await q
+    return { data: data || [], total: count || (data?.length ?? 0) }
+  },
 })
+
 export const useAthlete = (id: any) => useQuery({
   queryKey: ['athlete', id],
-  queryFn: () => fetcher<any>(`/api/clients/${id}`),
+  queryFn: async () => {
+    const { data } = await supabase.from('clients').select('*').eq('id', id).single()
+    return data
+  },
   enabled: !!id,
 })
-// Returns array from /api/bonuses
+
 export const useBonuses = () => useQuery({
   queryKey: ['bonuses'],
-  queryFn: () => fetcher<any>('/api/bonuses'),
+  queryFn: async () => {
+    const { data } = await supabase.from('bonuses').select('*, clients(name, team, league)').order('created_at', { ascending: false }).limit(50)
+    return data || []
+  },
 })
-// Returns array from /api/free-agency
+
 export const useFreeAgency = () => useQuery({
   queryKey: ['free-agency'],
-  queryFn: () => fetcher<any>('/api/free-agency'),
+  queryFn: async () => {
+    const now = new Date().toISOString().split('T')[0]
+    const nextYear = new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]
+    const { data } = await supabase.from('clients').select('id,name,team,league,position,salary_annual,contract_end_date').eq('client_type', 'athlete').lte('contract_end_date', nextYear).gte('contract_end_date', now).order('contract_end_date').limit(50)
+    return data || []
+  },
 })
 
 // ── Music ──────────────────────────────────────────────────────────────────
 export const useMusicDashboard = () => useQuery({
   queryKey: ['music-dashboard'],
-  queryFn: () => fetcher<any>('/api/music/dashboard'),
+  queryFn: async () => {
+    const { count } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('client_type', 'music')
+    return { total_artists: count }
+  },
 })
-export const useMusicArtists = (p?: any) => useQuery({
-  queryKey: ['music-artists', p],
-  queryFn: () => fetcher<any>('/api/clients?' + new URLSearchParams({ client_type: 'music', ...p }).toString()),
+
+export const useMusicArtists = (filters?: any) => useQuery({
+  queryKey: ['music-artists', filters],
+  queryFn: async () => {
+    let q = supabase.from('clients').select('*').eq('client_type', 'music').order('name').limit(200)
+    if (filters?.search) q = q.ilike('name', `%${filters.search}%`)
+    const { data } = await q
+    return { data: data || [], total: data?.length || 0 }
+  },
 })
 
 // ── Civilians ──────────────────────────────────────────────────────────────
-// /api/civilians/dashboard and /api/civilians/list
 export const useCiviliansDashboard = () => useQuery({
   queryKey: ['civilians-dashboard'],
-  queryFn: () => fetcher<any>('/api/civilians/dashboard'),
+  queryFn: async () => {
+    const { count: total } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('client_type', 'civilian')
+    const { count: withInsta } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('client_type', 'civilian').not('instagram_handle', 'is', null)
+    return { total_civilians: total, with_instagram: withInsta }
+  },
 })
-export const useCivilians = (p?: any) => useQuery({
-  queryKey: ['civilians', p],
-  queryFn: () => fetcher<any>('/api/civilians/list?' + (p ? new URLSearchParams(p).toString() : '')),
+
+export const useCivilians = (filters?: any) => useQuery({
+  queryKey: ['civilians', filters],
+  queryFn: async () => {
+    let q = supabase.from('clients').select('*').eq('client_type', 'civilian').order('name').limit(200)
+    if (filters?.search) q = q.ilike('name', `%${filters.search}%`)
+    const { data } = await q
+    return { data: data || [], total: data?.length || 0 }
+  },
 })
-export const useApproveOutreach = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: any) => poster(`/api/outreach/approve/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['outreach-queue'] }),
-  })
-}
 
 // ── Influencers ────────────────────────────────────────────────────────────
 export const useInfluencersDashboard = () => useQuery({
   queryKey: ['inf-dashboard'],
-  queryFn: () => fetcher<any>('/api/influencers/dashboard'),
+  queryFn: async () => {
+    const { count } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('client_type', 'influencer')
+    return { total_influencers: count }
+  },
 })
-export const useInfluencers = (p?: any) => useQuery({
-  queryKey: ['influencers', p],
-  queryFn: () => fetcher<any>('/api/clients?' + new URLSearchParams({ client_type: 'influencer', ...p }).toString()),
+
+export const useInfluencers = (filters?: any) => useQuery({
+  queryKey: ['influencers', filters],
+  queryFn: async () => {
+    let q = supabase.from('clients').select('*').eq('client_type', 'influencer').order('name').limit(200)
+    if (filters?.search) q = q.ilike('name', `%${filters.search}%`)
+    const { data } = await q
+    return { data: data || [], total: data?.length || 0 }
+  },
 })
 
 // ── Sales ──────────────────────────────────────────────────────────────────
-// /api/analytics/sales-summary returns the full breakdown
 export const useSalesDashboard = () => useQuery({
   queryKey: ['sales-dashboard'],
-  queryFn: () => fetcher<any>('/api/analytics/sales-summary'),
+  queryFn: async () => {
+    const { data } = await supabase.from('sales_transactions').select('amount, category, created_at').order('created_at', { ascending: false }).limit(500)
+    if (!data) return {}
+    const total_revenue = data.reduce((s, r) => s + (r.amount || 0), 0)
+    const by_category: Record<string, number> = {}
+    for (const r of data) { by_category[r.category || 'Other'] = (by_category[r.category || 'Other'] || 0) + (r.amount || 0) }
+    return { total_revenue, total_transactions: data.length, by_category: Object.entries(by_category).map(([k, v]) => ({ category: k, total: v })) }
+  },
 })
-export const useSalesTransactions = (p?: any) => useQuery({
-  queryKey: ['sales-txns', p],
-  queryFn: () => fetcher<any>('/api/sales/transactions?' + (p ? new URLSearchParams(p).toString() : '')),
+
+export const useSalesTransactions = () => useQuery({
+  queryKey: ['sales-txns'],
+  queryFn: async () => {
+    const { data } = await supabase.from('sales_transactions').select('*, clients(name)').order('created_at', { ascending: false }).limit(100)
+    return data || []
+  },
 })
+
 export const useSalesPayouts = () => useQuery({
   queryKey: ['payouts'],
-  queryFn: () => fetcher<any>('/api/sales/payouts'),
-})
-export const useAnalyticsSalesByYear = () => useQuery({
-  queryKey: ['sales-by-year'],
-  queryFn: () => fetcher<any>('/api/analytics/sales-by-year'),
-})
-export const useAnalyticsSalesByCategory = () => useQuery({
-  queryKey: ['sales-by-category'],
-  queryFn: () => fetcher<any>('/api/analytics/sales-by-category'),
-})
-export const useTopClients = () => useQuery({
-  queryKey: ['top-clients'],
-  queryFn: () => fetcher<any>('/api/analytics/top-clients'),
+  queryFn: async () => {
+    const { data } = await supabase.from('payouts').select('*').order('created_at', { ascending: false }).limit(50)
+    return data || []
+  },
 })
 
 // ── System ─────────────────────────────────────────────────────────────────
 export const useSystemHealth = () => useQuery({
   queryKey: ['health'],
-  queryFn: () => fetcher<any>('/api/system-status'),
+  queryFn: async () => {
+    const { data } = await supabase.from('system_logs').select('*').order('created_at', { ascending: false }).limit(1).single()
+    return data || { status: 'operational' }
+  },
   refetchInterval: 30_000,
 })
+
 export const useLogicAuditor = () => useQuery({
   queryKey: ['auditor'],
-  queryFn: () => fetcher<any>('/api/system/logic-auditor'),
+  queryFn: async () => {
+    const { data } = await supabase.from('logic_auditor_results').select('*').order('created_at', { ascending: false }).limit(20)
+    return data || []
+  },
 })
+
 export const useQABrain = () => useQuery({
   queryKey: ['qa-brain'],
-  queryFn: () => fetcher<any>('/api/system/qa-brain'),
+  queryFn: async () => {
+    const { data } = await supabase.from('qa_brain_results').select('*').order('created_at', { ascending: false }).limit(20)
+    return data || []
+  },
 })
+
 export const useJarvisIntelligence = () => useQuery({
   queryKey: ['jarvis'],
-  queryFn: () => fetcher<any>('/api/jarvis/intelligence'),
-})
-export const useJarvisStatus = () => useQuery({
-  queryKey: ['jarvis-status'],
-  queryFn: () => fetcher<any>('/api/jarvis/status'),
+  queryFn: async () => {
+    const { data } = await supabase.from('daily_reports').select('*').order('created_at', { ascending: false }).limit(1).single()
+    return data
+  },
 })
 
 // ── Alerts ─────────────────────────────────────────────────────────────────
-// /api/alerts is the main alerts route
 export const useAlerts = () => useQuery({
   queryKey: ['alerts'],
-  queryFn: () => fetcher<any>('/api/alerts'),
+  queryFn: async () => {
+    const { data } = await supabase.from('proactive_alerts').select('*').order('created_at', { ascending: false }).limit(100)
+    return data || []
+  },
   refetchInterval: 30_000,
 })
-export const useProactiveAlerts = () => useQuery({
-  queryKey: ['proactive-alerts'],
-  queryFn: () => fetcher<any>('/api/proactive-alerts'),
-  refetchInterval: 60_000,
-})
+
+export const useProactiveAlerts = useAlerts
 
 // ── Birthdays ──────────────────────────────────────────────────────────────
-// Returns: array of { client_id, name, team, league, birthday, days_until, age }
 export const useBirthdays = () => useQuery({
   queryKey: ['birthdays'],
-  queryFn: () => fetcher<any>('/api/upcoming-birthdays'),
+  queryFn: async () => {
+    const today = new Date()
+    const { data } = await supabase.from('clients').select('id,name,birthday,league,team,client_type').not('birthday', 'is', null).limit(500)
+    if (!data) return []
+    return data
+      .map(c => {
+        const bday = new Date(c.birthday)
+        const next = new Date(today.getFullYear(), bday.getMonth(), bday.getDate())
+        if (next < today) next.setFullYear(today.getFullYear() + 1)
+        const days_until = Math.round((next.getTime() - today.getTime()) / (1000*60*60*24))
+        const age = today.getFullYear() - bday.getFullYear()
+        return { ...c, days_until, age }
+      })
+      .filter(c => c.days_until <= 30)
+      .sort((a, b) => a.days_until - b.days_until)
+  },
 })
 
 // ── Highlights ─────────────────────────────────────────────────────────────
-// /api/contract-signings is the highlights feed
 export const useContractHighlights = () => useQuery({
   queryKey: ['highlights'],
-  queryFn: () => fetcher<any>('/api/contract-signings'),
+  queryFn: async () => {
+    const { data } = await supabase.from('contract_signings').select('*').order('signing_date', { ascending: false }).limit(50)
+    return data || []
+  },
 })
 
 // ── Outreach ───────────────────────────────────────────────────────────────
-// /api/outreach/approval-queue returns messages awaiting approval
 export const useOutreachQueue = () => useQuery({
   queryKey: ['outreach-queue'],
-  queryFn: () => fetcher<any>('/api/outreach/approval-queue'),
+  queryFn: async () => {
+    const { data } = await supabase.from('outreach_queue').select('*, clients(name, instagram_handle)').eq('status', 'pending').order('created_at', { ascending: false }).limit(50)
+    return data || []
+  },
 })
+
 export const useOutreachStats = () => useQuery({
   queryKey: ['outreach-stats'],
-  queryFn: () => fetcher<any>('/api/outreach/stats'),
+  queryFn: async () => {
+    const { count: pending } = await supabase.from('outreach_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+    const { count: approved } = await supabase.from('outreach_queue').select('*', { count: 'exact', head: true }).eq('status', 'approved')
+    const { count: total } = await supabase.from('outreach_queue').select('*', { count: 'exact', head: true })
+    return { pending, approved, total_generated: total }
+  },
 })
-export const useRejectOutreach = () => {
+
+export const useApproveOutreach = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: any) => poster(`/api/outreach/reject/${id}`),
+    mutationFn: async (id: any) => {
+      await supabase.from('outreach_queue').update({ status: 'approved' }).eq('id', id)
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['outreach-queue'] }),
   })
 }
 
-// ── Draft / prospects ──────────────────────────────────────────────────────
-export const useDraftProspects = (p?: any) => useQuery({
-  queryKey: ['draft-prospects', p],
-  queryFn: () => fetcher<any>('/api/draft-prospects?' + (p ? new URLSearchParams(p).toString() : '')),
-})
+export const useRejectOutreach = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: any) => {
+      await supabase.from('outreach_queue').update({ status: 'rejected' }).eq('id', id)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['outreach-queue'] }),
+  })
+}
 
-// ── Global search ──────────────────────────────────────────────────────────
+// ── Search ─────────────────────────────────────────────────────────────────
 export const useSearch = (q: string) => useQuery({
   queryKey: ['search', q],
-  queryFn: () => fetcher<any>(`/api/clients?search=${encodeURIComponent(q)}&limit=30`),
+  queryFn: async () => {
+    const { data } = await supabase.from('clients').select('id,name,client_type,league,team,position,headshot_url').ilike('name', `%${q}%`).limit(30)
+    return { data: data || [], total: data?.length || 0 }
+  },
   enabled: q.length >= 2,
-})
-
-// ── Situation room (separate endpoint) ────────────────────────────────────
-export const useSituationRoom = () => useQuery({
-  queryKey: ['situation-room'],
-  queryFn: () => fetcher<any>('/api/dashboard/summary'),
-  staleTime: 60_000,
 })

@@ -1,29 +1,17 @@
-// The Replit app IS the API server — it has Supabase access
-// All calls must go to the production Replit URL
-const REPLIT_URL = 'https://global-sphere--BigMike88.replit.app'
+import { createClient } from '@supabase/supabase-js'
 
-export { REPLIT_URL }
+export const supabase = createClient(
+  'https://ekmkwskitcxhkmebyuih.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrbWt3c2tpdGN4aGttZWJ5dWloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwMDM4OTMsImV4cCI6MjA4NDU3OTg5M30.HCtJenHxW_x-befEWc5ylKaWJFQzp1yEfscbnwMpnE0'
+)
 
-export async function fetcher<T>(path: string): Promise<T> {
-  const url = `${REPLIT_URL}${path}`
-  const r = await fetch(url, {
-    headers: { 'Accept': 'application/json' },
-    cache: 'no-store',
-  })
-  if (!r.ok) {
-    const text = await r.text().catch(() => '')
-    throw new Error(`${r.status} ${url}: ${text.slice(0, 100)}`)
-  }
-  return r.json()
-}
-
+// Still keep Replit poster for mutations (approve outreach etc)
+const REPLIT = 'https://global-sphere--BigMike88.replit.app'
 export async function poster(path: string, body?: any) {
-  const url = `${REPLIT_URL}${path}`
-  const r = await fetch(url, {
+  const r = await fetch(`${REPLIT}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
-    cache: 'no-store',
   })
   return r.json()
 }
