@@ -1,15 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Service role key — bypasses RLS, server-side only, never exposed to browser
-const sb = createClient(
-  'https://ekmkwskitcxhkmebyuih.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrbWt3c2tpdGN4aGttZWJ5dWloIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTAwMzg5MywiZXhwIjoyMDg0NTc5ODkzfQ.egHJA3mdrlM90quDvkKQfLfKKgPo00l1pqV4QCaO1EQ'
-)
+const SUPABASE_URL = 'https://ekmkwskitcxhkmebyuih.supabase.co'
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrbWt3c2tpdGN4aGttZWJ5dWloIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTAwMzg5MywiZXhwIjoyMDg0NTc5ODkzfQ.egHJA3mdrlM90quDvkKQfLfKKgPo00l1pqV4QCaO1EQ'
+
+const sb = createClient(SUPABASE_URL, SERVICE_KEY)
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const type = searchParams.get('type')
+
+  // DEBUG endpoint - see raw Supabase state
+  if (type === 'debug') {
+    try {
+      // Try raw count with no filters
+      const { count: rawCount, error: rawErr } = await sb
+        .from('clients').select('*', { count: 'exact', head: true })
+      
+      // Get distinct client_type values
+      const { data: types, error: typesErr } = await sb
+        .from('clients').select('client_type').limit(200)
+      
+      const typeCounts: Record<string, number> = {}
+      for (const row of (types ?? [])) {
+        const t = row.client_type || 'NULL'
+        typeCounts[t] = (typeCounts[t] || 0) + 1
+      }
+
+      // Get 3 raw rows
+      const { data: sample, error: sampleErr } = await sb
+        .from('clients').select('id,name,client_type,league').limit(3)
+
+      // Check proactive_alerts
+      const { count: alertCount, error: alertErr } = await sb
+        .from('proactive_alerts').select('*', { count: 'exact', head: true })
+
+      return NextResponse.json({
+        url: SUPABASE_URL,
+        rawCount,
+        rawError: rawErr?.message,
+        distinctClientTypes: typeCounts,
+        sample,
+        sampleError: sampleErr?.message,
+        alertCount,
+        alertError: alertErr?.message,
+      })
+    } catch (e: any) {
+      return NextResponse.json({ fatalError: e.message })
+    }
+  }
 
   try {
     switch (type) {
@@ -46,7 +85,6 @@ export async function GET(req: NextRequest) {
         if (search) q = q.ilike('name', `%${search}%`)
         if (league) q = q.eq('league', league)
         const { data, count } = await q
-        // Also get bonuses and free agency counts
         const [bonuses, fa] = await Promise.all([
           sb.from('contract_bonuses').select('id,client_name,bonus_category,bonus_amount,progress_percentage,status,league').order('created_at', { ascending: false }).limit(100),
           sb.from('free_agency_status').select('id,client_id,status,eligible_date,market_value_estimate,season,clients(name,team,league,position)').order('eligible_date').limit(50),
@@ -56,7 +94,7 @@ export async function GET(req: NextRequest) {
 
       case 'athlete': {
         const id = searchParams.get('id')
-        if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+        if (!id) return NextResponse.json(null)
         const { data } = await sb.from('clients').select('*').eq('id', id).single()
         return NextResponse.json(data ?? null)
       }
@@ -93,18 +131,17 @@ export async function GET(req: NextRequest) {
       }
 
       case 'sales': {
-        const [txns, summary] = await Promise.all([
+        const [txns, all] = await Promise.all([
           sb.from('sales_transactions').select('id,client_name,category,item_description,amount,commission_amount,transaction_date,notes').order('transaction_date', { ascending: false }).limit(200),
           sb.from('sales_transactions').select('amount,category').limit(2000),
         ])
-        const all = summary.data ?? []
-        const total = all.reduce((s, r) => s + (r.amount || 0), 0)
+        const total = (all.data ?? []).reduce((s, r) => s + (r.amount || 0), 0)
         const by_cat: Record<string, number> = {}
-        for (const r of all) { by_cat[r.category || 'Other'] = (by_cat[r.category || 'Other'] || 0) + (r.amount || 0) }
+        for (const r of (all.data ?? [])) { by_cat[r.category || 'Other'] = (by_cat[r.category || 'Other'] || 0) + (r.amount || 0) }
         return NextResponse.json({
           transactions: txns.data ?? [],
           total_revenue: total,
-          total_transactions: all.length,
+          total_transactions: all.data?.length ?? 0,
           by_category: Object.entries(by_cat).map(([k, v]) => ({ category: k, total: v })).sort((a, b) => b.total - a.total),
         })
       }
@@ -129,7 +166,7 @@ export async function GET(req: NextRequest) {
       case 'birthdays': {
         const { data } = await sb.from('clients')
           .select('id,name,birthday,league,team,client_type,headshot_url').not('birthday', 'is', null).limit(2000)
-        if (!data) return NextResponse.json([])
+        if (!data?.length) return NextResponse.json([])
         const today = new Date()
         const results = data.map(c => {
           const bd = new Date(c.birthday as string)
@@ -169,11 +206,10 @@ export async function GET(req: NextRequest) {
       }
 
       default:
-        return NextResponse.json({ error: 'Unknown type' }, { status: 400 })
+        return NextResponse.json({ error: 'Unknown type: ' + type }, { status: 400 })
     }
   } catch (err: any) {
-    console.error('API error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: err.message, stack: err.stack?.slice(0, 200) }, { status: 500 })
   }
 }
 
@@ -181,7 +217,6 @@ export async function POST(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const action = searchParams.get('action')
   const id = searchParams.get('id')
-
   try {
     if (action === 'approve' && id) {
       await sb.from('approval_queue').update({ status: 'approved', reviewed_at: new Date().toISOString() }).eq('id', id)
