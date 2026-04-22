@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = 'https://ekmkwskitcxhkmebyuih.supabase.co'
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrbWt3c2tpdGN4aGttZWJ5dWloIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTAwMzg5MywiZXhwIjoyMDg0NTc5ODkzfQ.egHJA3mdrlM90quDvkKQfLfKKgPo00l1pqV4QCaO1EQ'
+const SUPABASE_URL = 'https://awuvdxuxrrzylepzcezx.supabase.co'
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF3dXZkeHV4cnJ6eWxlcHpjZXp4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Njg3NjYzMywiZXhwIjoyMDkyNDUyNjMzfQ.5tQHfdUmdmfEdh2Tdt9HleytSrvJd0fakv39155TOvI'
 
 // Create with explicit fetch options to handle timeouts
 const sb = createClient(SUPABASE_URL, SERVICE_KEY, {
